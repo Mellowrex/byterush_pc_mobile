@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ByteRush - High Score Edition</title>
+    <title>ByteRush - Light & Fixed Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -64,6 +64,7 @@
         #joystick-knob {
             position: absolute; top: 35px; left: 35px; width: 50px; height: 50px;
             background: var(--neon-blue); border-radius: 50%; box-shadow: 0 0 15px var(--neon-blue);
+            pointer-events: none;
         }
         #mobile-btns {
             position: absolute; bottom: 40px; right: 40px; display: none; gap: 20px; z-index: 2000;
@@ -170,6 +171,7 @@
     let trackIdx = parseInt(localStorage.getItem('lastTrackIdx') || '0');
 
     function playMusic() {
+        if(!playlist[trackIdx]) return;
         bgMusic.src = playlist[trackIdx];
         bgMusic.volume = 0.5;
         bgMusic.play().catch(() => {});
@@ -178,7 +180,7 @@
     }
 
     function createCircuitTexture(renderer) {
-        const size = 512; 
+        const size = 512;
         const canvas = document.createElement('canvas');
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d');
@@ -196,13 +198,14 @@
         }
         const texture = new THREE.CanvasTexture(canvas);
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
         return texture;
     }
 
     window.onload = function() {
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x010103);
-        scene.fog = new THREE.Fog(0x010103, 10, 100);
+        scene.fog = new THREE.Fog(0x010103, 10, 110);
 
         const cameraHolder = new THREE.Group();
         cameraHolder.position.y = 2.2; 
@@ -212,7 +215,7 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: !isTouch });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.3)); 
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); 
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.PointerLockControls(cameraHolder, document.body);
@@ -247,8 +250,8 @@
         });
 
         const chipTexture = createCircuitTexture(renderer);
-        const wallMaterial = new THREE.MeshStandardMaterial({ map: chipTexture, roughness: 1.0 });
-        const floorMaterial = new THREE.MeshStandardMaterial({ map: chipTexture, roughness: 1.0 });
+        const wallMaterial = new THREE.MeshStandardMaterial({ map: chipTexture, roughness: 0.7 });
+        const floorMaterial = new THREE.MeshStandardMaterial({ map: chipTexture, roughness: 0.7 });
 
         const handGroup = new THREE.Group();
         camera.add(handGroup);
@@ -308,15 +311,17 @@
                 const w = new THREE.Mesh(new THREE.BoxGeometry(1.5, 25, 10), wallMaterial);
                 w.position.set(x, 10, z); scene.add(w); wallObjects.push(w);
                 if (Math.abs(z) % 20 === 0) {
-                    const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 4}));
+                    // Исправлено: Каждой лампе свой материал, чтобы менять цвет индивидуально
+                    const lMat = new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 5});
+                    const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), lMat);
                     l.position.set(x > 0 ? 7.2 : -7.2, 5, z); scene.add(l);
-                    const pl = new THREE.PointLight(0x00f0ff, 3.0, 25); pl.position.copy(l.position); scene.add(pl);
+                    const pl = new THREE.PointLight(0x00f0ff, 4, 25); pl.position.copy(l.position); scene.add(pl);
                     lamps.push({ mesh: l, light: pl });
                 }
             });
             if (!isSafe) {
                 if (Math.random() > 0.5) {
-                    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4), new THREE.MeshStandardMaterial({color: 0xffcc00, emissive: 0xffcc00, emissiveIntensity: 2.5}));
+                    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4), new THREE.MeshStandardMaterial({color: 0xffcc00, emissive: 0xffcc00, emissiveIntensity: 2}));
                     c.position.set(Math.random()*12-6, 1.5, z); scene.add(c); coins.push(c);
                 }
                 if (Math.random() > 0.7) {
@@ -347,16 +352,18 @@
             else if (wallSide !== 0) { velocity.y = 16; velocity.x = -wallSide * 22; velocity.z -= 12; wallSide = 0; }
         }
 
+        // --- МОБИЛЬНОЕ УПРАВЛЕНИЕ (ИСПРАВЛЕННЫЙ ДЖОЙСТИК) ---
         let touchData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, lookTouchId: null, lastLookX: 0, lastLookY: 0 };
         const joyKnob = document.getElementById('joystick-knob');
         
         renderer.domElement.addEventListener('touchstart', e => {
+            e.preventDefault();
             for(let i=0; i<e.changedTouches.length; i++) {
                 let t = e.changedTouches[i];
                 if (t.clientX < window.innerWidth / 2) { 
                     touchData.active = true;
                     touchData.startX = t.clientX; touchData.startY = t.clientY;
-                } else { 
+                } else {
                     touchData.lookTouchId = t.identifier;
                     touchData.lastLookX = t.clientX; touchData.lastLookY = t.clientY;
                 }
@@ -376,8 +383,7 @@
                     joyKnob.style.transform = `translate(${touchData.moveX * 50}px, ${touchData.moveY * 50}px)`;
                 } else if (t.identifier === touchData.lookTouchId) {
                     const dx = t.clientX - touchData.lastLookX;
-                    const dy = t.clientY - touchData.lastLookY;
-                    cameraHolder.rotation.y -= dx * 0.006;
+                    cameraHolder.rotation.y -= dx * 0.008;
                     touchData.lastLookX = t.clientX; touchData.lastLookY = t.clientY;
                 }
             }
@@ -386,7 +392,7 @@
         window.addEventListener('touchend', e => {
             for(let i=0; i<e.changedTouches.length; i++) {
                 let t = e.changedTouches[i];
-                if (t.clientX < window.innerWidth / 2) {
+                if (touchData.active && t.clientX < window.innerWidth / 2) {
                     touchData.active = false;
                     touchData.moveX = 0; touchData.moveY = 0;
                     joyKnob.style.transform = `translate(0,0)`;
@@ -402,19 +408,19 @@
         function attack() {
             if (isAttacking || (!controls.isLocked && !isTouch)) return;
             isAttacking = true;
-            const tl = new THREE.Vector3(0, 0, -1.3);
-            leftH.position.add(tl); rightH.position.add(tl);
+            leftH.position.z -= 1.2; rightH.position.z -= 1.2;
             const attackRay = new THREE.Raycaster(cameraHolder.position, camera.getWorldDirection(new THREE.Vector3()));
             const hits = attackRay.intersectObjects(hazardObjects);
             if (hits.length > 0 && hits[0].distance < 7) {
                 scene.remove(hits[0].object); hazardObjects.splice(hazardObjects.indexOf(hits[0].object), 1);
                 kills++; 
             }
-            setTimeout(() => { leftH.position.sub(tl); rightH.position.sub(tl); isAttacking = false; }, 100);
+            setTimeout(() => { leftH.position.z += 1.2; rightH.position.z += 1.2; isAttacking = false; }, 100);
         }
 
         let prevTime = performance.now();
         let frameCount = 0;
+
         function animate() {
             requestAnimationFrame(animate);
             if (!gameActive) return;
@@ -426,14 +432,14 @@
 
             let isRunning = keys['ShiftLeft'] || (isTouch && Math.abs(touchData.moveY) > 0.8);
             if (isRunning && (keys['KeyW'] || touchData.active) && stamina > 0) {
-                speedFactor = THREE.MathUtils.lerp(speedFactor, 2.4, 0.1); stamina -= 38 * delta;
+                speedFactor = THREE.MathUtils.lerp(speedFactor, 2.5, 0.1); stamina -= 35 * delta;
             } else {
-                speedFactor = THREE.MathUtils.lerp(speedFactor, 1.0, 0.2); if (stamina < 100) stamina += 28 * delta;
+                speedFactor = THREE.MathUtils.lerp(speedFactor, 1.0, 0.2); if (stamina < 100) stamina += 25 * delta;
             }
             document.getElementById('stamina-fill').style.width = Math.max(0, stamina) + '%';
 
             velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta; velocity.y -= 38.0 * delta;
-            const moveStep = 220.0 * delta * speedFactor;
+            const moveStep = 230.0 * delta * speedFactor;
 
             if (keys['KeyW']) velocity.z -= moveStep; if (keys['KeyS']) velocity.z += moveStep;
             if (keys['KeyA']) velocity.x -= moveStep; if (keys['KeyD']) velocity.x += moveStep;
@@ -455,7 +461,7 @@
                 });
             }
             if (wallSide !== 0) {
-                velocity.y = 0; velocity.z -= 75 * delta;
+                velocity.y = 0; velocity.z -= 80 * delta;
                 camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, 0.35 * wallSide, 0.1);
             } else { camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, 0, 0.1); }
 
@@ -469,10 +475,11 @@
             cameraHolder.position.y += velocity.y * delta;
             if (cameraHolder.position.y > 10.5) { cameraHolder.position.y = 10.5; velocity.y = 0; }
 
+            // КОЛЛИЗИИ СТЕН
             wallObjects.forEach(w => {
                 const dx = cameraHolder.position.x - w.position.x;
                 const dz = Math.abs(cameraHolder.position.z - w.position.z);
-                if (dz < 5 && Math.abs(dx) < 2.3) { cameraHolder.position.x = w.position.x + (dx > 0 ? 2.3 : -2.3); }
+                if (dz < 5.1 && Math.abs(dx) < 2.3) { cameraHolder.position.x = w.position.x + (dx > 0 ? 2.3 : -2.3); }
             });
 
             downRay.set(cameraHolder.position, new THREE.Vector3(0,-1,0));
@@ -511,11 +518,13 @@
                 lastZ -= 10; generateChunk(lastZ); cleanup(cameraHolder.position.z); 
             }
 
-            if (frameCount % 2 === 0) {
-                const hue = (time * 0.0002) % 1; 
-                const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-                lamps.forEach(l => { if(l.mesh.material) l.mesh.material.emissive.copy(color); l.light.color.copy(color); });
-            }
+            // ПЛАВНАЯ СМЕНА ЦВЕТА СВЕТА
+            const hue = (time * 0.00015) % 1; 
+            const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
+            lamps.forEach(l => { 
+                if(l.mesh.material) l.mesh.material.emissive.copy(color); 
+                l.light.color.copy(color); 
+            });
             
             if (!isAttacking) handGroup.position.y = Math.sin(time * 0.005) * 0.02 + (velocity.z !== 0 ? Math.sin(time * 0.01)*0.04 : 0);
 
@@ -529,8 +538,9 @@
 
             renderer.render(scene, camera);
         }
-        // Яркость AmbientLight увеличена для общего освещения сцены
-        scene.add(new THREE.AmbientLight(0xffffff, 1.8));
+        
+        // ОБЩИЙ СВЕТ (СДЕЛАНО СВЕТЛЕЕ)
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
         animate();
         window.onresize = () => {
             camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
