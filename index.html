@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ByteRush - High Score Edition</title>
+    <title>ByteRush - High Bright Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -57,14 +57,16 @@
         #stamina-fill { width: 100%; height: 100%; background: var(--neon-blue); }
 
         #joystick-wrapper {
-            position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px;
-            background: rgba(255,255,255,0.1); border: 2px solid var(--neon-blue);
+            position: absolute; width: 100px; height: 100px;
+            background: rgba(0, 240, 255, 0.1); border: 2px solid var(--neon-blue);
             border-radius: 50%; display: none; z-index: 2000; touch-action: none;
+            pointer-events: none;
         }
         #joystick-knob {
-            position: absolute; top: 35px; left: 35px; width: 50px; height: 50px;
+            position: absolute; top: 25px; left: 25px; width: 50px; height: 50px;
             background: var(--neon-blue); border-radius: 50%; box-shadow: 0 0 15px var(--neon-blue);
         }
+
         #mobile-btns {
             position: absolute; bottom: 40px; right: 40px; display: none; gap: 20px; z-index: 2000;
         }
@@ -129,14 +131,14 @@
 
     const i18n = {
         ru: {
-            ctrl: isTouch ? `> ДЖОЙСТИК: <span class="yellow">ДВИЖЕНИЕ</span><br>> ЭКРАН СПРАВА: <span class="yellow">ОБЗОР</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">АВТО-БЕГ</span>` : 
+            ctrl: isTouch ? `> ТАЧ СЛЕВА: <span class="yellow">ДВИЖЕНИЕ (ДЖОЙСТИК)</span><br>> ЭКРАН СПРАВА: <span class="yellow">ОБЗОР</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">АВТО-БЕГ</span>` : 
                  `> WASD: <span class="yellow">ДВИЖЕНИЕ</span><br>> SHIFT: <span class="yellow">СПРИНТ (ДЭШ)</span><br>> ПКМ + SHIFT: <span class="yellow">БЕГ ПО СТЕНЕ</span><br>> ПРОБЕЛ: <span class="pink">ПРЫЖОК / ОТСКОК</span><br>> ЛКМ: <span class="pink">УДАР ПО ВИРУСУ</span>`,
             boot: "ЗАПУСК_СИСТЕМЫ", pause: "ПАУЗА", proceed: "ПРОДОЛЖИТЬ", crash: "СБОЙ_СИСТЕМЫ", reboot: "ПЕРЕЗАГРУЗКА", 
             ui_score: "ЯДРА", ui_dist: "ДИСТ", ui_kills: "ВИРУСЫ", ui_best: "РЕКОРД",
             new_rec: " (НОВЫЙ!)"
         },
         en: {
-            ctrl: isTouch ? `> JOYSTICK: <span class="yellow">MOVEMENT</span><br>> RIGHT SCREEN: <span class="yellow">LOOK</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN</span>` :
+            ctrl: isTouch ? `> LEFT TOUCH: <span class="yellow">MOVE (JOYSTICK)</span><br>> RIGHT SCREEN: <span class="yellow">LOOK</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN</span>` :
                  `> WASD: <span class="yellow">MOVEMENT</span><br>> SHIFT: <span class="yellow">SPRINT (DASH)</span><br>> RMB + SHIFT: <span class="yellow">WALL_RUN</span><br>> SPACE: <span class="pink">JUMP / WALL_JUMP</span><br>> LEFT_CLICK: <span class="pink">STRIKE VIRUS</span>`,
             boot: "BOOT_SYSTEM", pause: "PAUSED", proceed: "PROCEED", crash: "SYSTEM_CRASH", reboot: "REBOOT", 
             ui_score: "CORES", ui_dist: "DIST", ui_kills: "KILLS", ui_best: "BEST",
@@ -178,18 +180,18 @@
     }
 
     function createCircuitTexture(renderer) {
-        const size = 512; // Меньше размер текстуры для мобилок
+        const size = 512; 
         const canvas = document.createElement('canvas');
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#020205'; ctx.fillRect(0, 0, size, size);
-        ctx.strokeStyle = '#080812'; ctx.lineWidth = 2;
+        ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = '#151535'; ctx.lineWidth = 4;
         for(let i=0; i<=size; i+=64) {
             ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, size); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(size, i); ctx.stroke();
         }
-        ctx.strokeStyle = '#00f0ff'; ctx.lineWidth = 1; ctx.globalAlpha = 0.3;
-        for(let i=0; i<8; i++) {
+        ctx.strokeStyle = '#00f0ff'; ctx.lineWidth = 2; ctx.globalAlpha = 0.5;
+        for(let i=0; i<12; i++) {
             let x = Math.floor(Math.random() * 8) * 64;
             let y = Math.floor(Math.random() * 8) * 64;
             ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 64, y); ctx.lineTo(x + 64, y + 64); ctx.stroke();
@@ -202,7 +204,7 @@
     window.onload = function() {
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x010103);
-        scene.fog = new THREE.Fog(0x010103, 10, 100);
+        scene.fog = new THREE.Fog(0x010103, 30, 140);
 
         const cameraHolder = new THREE.Group();
         cameraHolder.position.y = 2.2; 
@@ -210,10 +212,9 @@
         cameraHolder.add(camera);
         scene.add(cameraHolder);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: !isTouch });
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        // ОПТИМИЗАЦИЯ: Лимит разрешения
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.3)); 
+        renderer.setPixelRatio(window.devicePixelRatio); 
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.PointerLockControls(cameraHolder, document.body);
@@ -230,7 +231,6 @@
         function startGameMobile() {
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('pause-screen').style.display = 'none';
-            document.getElementById('joystick-wrapper').style.display = 'block';
             document.getElementById('mobile-btns').style.display = 'flex';
             gameActive = true;
         }
@@ -248,8 +248,9 @@
         });
 
         const chipTexture = createCircuitTexture(renderer);
-        const wallMaterial = new THREE.MeshStandardMaterial({ map: chipTexture, roughness: 1.0 });
-        const floorMaterial = new THREE.MeshStandardMaterial({ map: chipTexture, roughness: 1.0 });
+        // ИСПОЛЬЗУЕМ BASIC MATERIAL (БЕЗ ОТРАЖЕНИЙ)
+        const wallMaterial = new THREE.MeshBasicMaterial({ map: chipTexture });
+        const floorMaterial = new THREE.MeshBasicMaterial({ map: chipTexture });
 
         const handGroup = new THREE.Group();
         camera.add(handGroup);
@@ -257,8 +258,8 @@
 
         function createBlade(x) {
             const h = new THREE.Group();
-            const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.4), new THREE.MeshBasicMaterial({color: 0x000000}));
-            const blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 1.4), new THREE.MeshStandardMaterial({color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 2}));
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.4), new THREE.MeshBasicMaterial({color: 0x050505}));
+            const blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 1.4), new THREE.MeshBasicMaterial({color: 0x00f0ff}));
             blade.position.z = -0.7; h.add(arm, blade); h.position.set(0.75 * x, -0.5, -0.4);
             return h;
         }
@@ -271,10 +272,7 @@
         function removeObject(obj, array) {
             scene.remove(obj);
             if (obj.geometry) obj.geometry.dispose();
-            if (obj.material) {
-                if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
-                else obj.material.dispose();
-            }
+            if (obj.material) obj.material.dispose();
             const idx = array.indexOf(obj);
             if (idx > -1) array.splice(idx, 1);
         }
@@ -288,7 +286,7 @@
             });
             for (let i = lamps.length - 1; i >= 0; i--) {
                 if (lamps[i].mesh.position.z > threshold) {
-                    scene.remove(lamps[i].light); removeObject(lamps[i].mesh, []);
+                    removeObject(lamps[i].mesh, []);
                     lamps.splice(i, 1);
                 }
             }
@@ -309,19 +307,19 @@
                 const w = new THREE.Mesh(new THREE.BoxGeometry(1.5, 25, 10), wallMaterial);
                 w.position.set(x, 10, z); scene.add(w); wallObjects.push(w);
                 if (Math.abs(z) % 20 === 0) {
-                    const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 4}));
+                    // Лампы теперь просто светящиеся блоки
+                    const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), new THREE.MeshBasicMaterial({color: 0x00f0ff}));
                     l.position.set(x > 0 ? 7.2 : -7.2, 5, z); scene.add(l);
-                    const pl = new THREE.PointLight(0x00f0ff, 1.5, 20); pl.position.copy(l.position); scene.add(pl);
-                    lamps.push({ mesh: l, light: pl });
+                    lamps.push({ mesh: l });
                 }
             });
             if (!isSafe) {
                 if (Math.random() > 0.5) {
-                    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4), new THREE.MeshStandardMaterial({color: 0xffcc00, emissive: 0xffcc00, emissiveIntensity: 1.5}));
+                    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4), new THREE.MeshBasicMaterial({color: 0xffcc00}));
                     c.position.set(Math.random()*12-6, 1.5, z); scene.add(c); coins.push(c);
                 }
                 if (Math.random() > 0.7) {
-                    const h = new THREE.Mesh(new THREE.OctahedronGeometry(1.3), new THREE.MeshStandardMaterial({color: 0xff0000, wireframe: true, emissive: 0xff0000, emissiveIntensity: 2}));
+                    const h = new THREE.Mesh(new THREE.OctahedronGeometry(1.3), new THREE.MeshBasicMaterial({color: 0xff0000, wireframe: true}));
                     h.position.set(Math.random()*10-5, 2, z); scene.add(h); hazardObjects.push(h);
                 }
             }
@@ -348,17 +346,20 @@
             else if (wallSide !== 0) { velocity.y = 16; velocity.x = -wallSide * 22; velocity.z -= 12; wallSide = 0; }
         }
 
-        // --- МОБИЛЬНОЕ УПРАВЛЕНИЕ (ИСПРАВЛЕНО) ---
         let touchData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, lookTouchId: null, lastLookX: 0, lastLookY: 0 };
+        const joyWrapper = document.getElementById('joystick-wrapper');
         const joyKnob = document.getElementById('joystick-knob');
         
         renderer.domElement.addEventListener('touchstart', e => {
             for(let i=0; i<e.changedTouches.length; i++) {
                 let t = e.changedTouches[i];
-                if (t.clientX < window.innerWidth / 2) { // Левая часть - джойстик
+                if (t.clientX < window.innerWidth / 2) { 
                     touchData.active = true;
                     touchData.startX = t.clientX; touchData.startY = t.clientY;
-                } else { // Правая часть - обзор
+                    joyWrapper.style.display = 'block';
+                    joyWrapper.style.left = (t.clientX - 50) + 'px';
+                    joyWrapper.style.top = (t.clientY - 50) + 'px';
+                } else { 
                     touchData.lookTouchId = t.identifier;
                     touchData.lastLookX = t.clientX; touchData.lastLookY = t.clientY;
                 }
@@ -371,11 +372,11 @@
                 if (touchData.active && t.clientX < window.innerWidth / 2) {
                     const dx = t.clientX - touchData.startX;
                     const dy = t.clientY - touchData.startY;
-                    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
+                    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 40);
                     const angle = Math.atan2(dy, dx);
-                    touchData.moveX = Math.cos(angle) * (dist / 50);
-                    touchData.moveY = Math.sin(angle) * (dist / 50);
-                    joyKnob.style.transform = `translate(${touchData.moveX * 50}px, ${touchData.moveY * 50}px)`;
+                    touchData.moveX = Math.cos(angle) * (dist / 40);
+                    touchData.moveY = Math.sin(angle) * (dist / 40);
+                    joyKnob.style.transform = `translate(${touchData.moveX * 40}px, ${touchData.moveY * 40}px)`;
                 } else if (t.identifier === touchData.lookTouchId) {
                     const dx = t.clientX - touchData.lastLookX;
                     const dy = t.clientY - touchData.lastLookY;
@@ -391,6 +392,7 @@
                 if (t.clientX < window.innerWidth / 2) {
                     touchData.active = false;
                     touchData.moveX = 0; touchData.moveY = 0;
+                    joyWrapper.style.display = 'none';
                     joyKnob.style.transform = `translate(0,0)`;
                 } else if (t.identifier === touchData.lookTouchId) {
                     touchData.lookTouchId = null;
@@ -416,7 +418,6 @@
         }
 
         let prevTime = performance.now();
-        let frameCount = 0;
         function animate() {
             requestAnimationFrame(animate);
             if (!gameActive) return;
@@ -424,7 +425,6 @@
             const time = performance.now();
             const delta = Math.min((time - prevTime) / 1000, 0.05);
             prevTime = time;
-            frameCount++;
 
             let isRunning = keys['ShiftLeft'] || (isTouch && Math.abs(touchData.moveY) > 0.8);
             if (isRunning && (keys['KeyW'] || touchData.active) && stamina > 0) {
@@ -513,12 +513,9 @@
                 lastZ -= 10; generateChunk(lastZ); cleanup(cameraHolder.position.z); 
             }
 
-            // ОПТИМИЗАЦИЯ: Обновление цвета ламп реже
-            if (frameCount % 2 === 0) {
-                const hue = (time * 0.0002) % 1; 
-                const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-                lamps.forEach(l => { if(l.mesh.material) l.mesh.material.emissive.copy(color); l.light.color.copy(color); });
-            }
+            const hue = (time * 0.0002) % 1; 
+            const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
+            lamps.forEach(l => { if(l.mesh.material) l.mesh.material.color.copy(color); });
             
             if (!isAttacking) handGroup.position.y = Math.sin(time * 0.005) * 0.02 + (velocity.z !== 0 ? Math.sin(time * 0.01)*0.04 : 0);
 
@@ -532,8 +529,11 @@
 
             renderer.render(scene, camera);
         }
-        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+        
+        // Добавляем общий свет для яркости текстур
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2)); 
         animate();
+        
         window.onresize = () => {
             camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
