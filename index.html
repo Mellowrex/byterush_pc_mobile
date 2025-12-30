@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ByteRush - Light & Fixed Edition</title>
+    <title>ByteRush - Joystick Fixed</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -56,16 +56,19 @@
         #stamina-bar { width: 180px; height: 10px; border: 2px solid var(--neon-blue); background: rgba(0,0,0,0.5); margin-top: 10px; }
         #stamina-fill { width: 100%; height: 100%; background: var(--neon-blue); }
 
+        /* ИСПРАВЛЕННЫЙ ДЖОЙСТИК (Динамический) */
         #joystick-wrapper {
-            position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px;
-            background: rgba(255,255,255,0.1); border: 2px solid var(--neon-blue);
+            position: absolute; width: 100px; height: 100px;
+            background: rgba(255,255,255,0.05); border: 2px solid var(--neon-blue);
             border-radius: 50%; display: none; z-index: 2000; touch-action: none;
+            pointer-events: none; transform: translate(-50%, -50%);
         }
         #joystick-knob {
-            position: absolute; top: 35px; left: 35px; width: 50px; height: 50px;
+            position: absolute; top: 25px; left: 25px; width: 50px; height: 50px;
             background: var(--neon-blue); border-radius: 50%; box-shadow: 0 0 15px var(--neon-blue);
             pointer-events: none;
         }
+        
         #mobile-btns {
             position: absolute; bottom: 40px; right: 40px; display: none; gap: 20px; z-index: 2000;
         }
@@ -130,14 +133,14 @@
 
     const i18n = {
         ru: {
-            ctrl: isTouch ? `> ДЖОЙСТИК: <span class="yellow">ДВИЖЕНИЕ</span><br>> ЭКРАН СПРАВА: <span class="yellow">ОБЗОР</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">АВТО-БЕГ</span>` : 
+            ctrl: isTouch ? `> ЭКРАН СЛЕВА: <span class="yellow">ДЖОЙСТИК</span><br>> ЭКРАН СПРАВА: <span class="yellow">ОБЗОР</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">АВТО-БЕГ</span>` : 
                  `> WASD: <span class="yellow">ДВИЖЕНИЕ</span><br>> SHIFT: <span class="yellow">СПРИНТ (ДЭШ)</span><br>> ПКМ + SHIFT: <span class="yellow">БЕГ ПО СТЕНЕ</span><br>> ПРОБЕЛ: <span class="pink">ПРЫЖОК / ОТСКОК</span><br>> ЛКМ: <span class="pink">УДАР ПО ВИРУСУ</span>`,
             boot: "ЗАПУСК_СИСТЕМЫ", pause: "ПАУЗА", proceed: "ПРОДОЛЖИТЬ", crash: "СБОЙ_СИСТЕМЫ", reboot: "ПЕРЕЗАГРУЗКА", 
             ui_score: "ЯДРА", ui_dist: "ДИСТ", ui_kills: "ВИРУСЫ", ui_best: "РЕКОРД",
             new_rec: " (НОВЫЙ!)"
         },
         en: {
-            ctrl: isTouch ? `> JOYSTICK: <span class="yellow">MOVEMENT</span><br>> RIGHT SCREEN: <span class="yellow">LOOK</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN</span>` :
+            ctrl: isTouch ? `> LEFT SCREEN: <span class="yellow">JOYSTICK</span><br>> RIGHT SCREEN: <span class="yellow">LOOK</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN</span>` :
                  `> WASD: <span class="yellow">MOVEMENT</span><br>> SHIFT: <span class="yellow">SPRINT (DASH)</span><br>> RMB + SHIFT: <span class="yellow">WALL_RUN</span><br>> SPACE: <span class="pink">JUMP / WALL_JUMP</span><br>> LEFT_CLICK: <span class="pink">STRIKE VIRUS</span>`,
             boot: "BOOT_SYSTEM", pause: "PAUSED", proceed: "PROCEED", crash: "SYSTEM_CRASH", reboot: "REBOOT", 
             ui_score: "CORES", ui_dist: "DIST", ui_kills: "KILLS", ui_best: "BEST",
@@ -232,7 +235,6 @@
         function startGameMobile() {
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('pause-screen').style.display = 'none';
-            document.getElementById('joystick-wrapper').style.display = 'block';
             document.getElementById('mobile-btns').style.display = 'flex';
             gameActive = true;
         }
@@ -311,7 +313,6 @@
                 const w = new THREE.Mesh(new THREE.BoxGeometry(1.5, 25, 10), wallMaterial);
                 w.position.set(x, 10, z); scene.add(w); wallObjects.push(w);
                 if (Math.abs(z) % 20 === 0) {
-                    // Исправлено: Каждой лампе свой материал, чтобы менять цвет индивидуально
                     const lMat = new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 5});
                     const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), lMat);
                     l.position.set(x > 0 ? 7.2 : -7.2, 5, z); scene.add(l);
@@ -352,18 +353,24 @@
             else if (wallSide !== 0) { velocity.y = 16; velocity.x = -wallSide * 22; velocity.z -= 12; wallSide = 0; }
         }
 
-        // --- МОБИЛЬНОЕ УПРАВЛЕНИЕ (ИСПРАВЛЕННЫЙ ДЖОЙСТИК) ---
+        // --- ИСПРАВЛЕННЫЙ ДЖОЙСТИК (ЦЕНТРИРУЕТСЯ ПО КАСАНИЮ) ---
         let touchData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, lookTouchId: null, lastLookX: 0, lastLookY: 0 };
+        const joyWrapper = document.getElementById('joystick-wrapper');
         const joyKnob = document.getElementById('joystick-knob');
         
         renderer.domElement.addEventListener('touchstart', e => {
             e.preventDefault();
             for(let i=0; i<e.changedTouches.length; i++) {
                 let t = e.changedTouches[i];
+                // Левая половина экрана - джойстик
                 if (t.clientX < window.innerWidth / 2) { 
                     touchData.active = true;
                     touchData.startX = t.clientX; touchData.startY = t.clientY;
+                    joyWrapper.style.display = 'block';
+                    joyWrapper.style.left = t.clientX + 'px';
+                    joyWrapper.style.top = t.clientY + 'px';
                 } else {
+                    // Правая половина экрана - обзор
                     touchData.lookTouchId = t.identifier;
                     touchData.lastLookX = t.clientX; touchData.lastLookY = t.clientY;
                 }
@@ -376,11 +383,12 @@
                 if (touchData.active && t.clientX < window.innerWidth / 2) {
                     const dx = t.clientX - touchData.startX;
                     const dy = t.clientY - touchData.startY;
-                    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
+                    const maxDist = 40;
+                    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), maxDist);
                     const angle = Math.atan2(dy, dx);
-                    touchData.moveX = Math.cos(angle) * (dist / 50);
-                    touchData.moveY = Math.sin(angle) * (dist / 50);
-                    joyKnob.style.transform = `translate(${touchData.moveX * 50}px, ${touchData.moveY * 50}px)`;
+                    touchData.moveX = Math.cos(angle) * (dist / maxDist);
+                    touchData.moveY = Math.sin(angle) * (dist / maxDist);
+                    joyKnob.style.transform = `translate(${touchData.moveX * maxDist}px, ${touchData.moveY * maxDist}px)`;
                 } else if (t.identifier === touchData.lookTouchId) {
                     const dx = t.clientX - touchData.lastLookX;
                     cameraHolder.rotation.y -= dx * 0.008;
@@ -395,7 +403,7 @@
                 if (touchData.active && t.clientX < window.innerWidth / 2) {
                     touchData.active = false;
                     touchData.moveX = 0; touchData.moveY = 0;
-                    joyKnob.style.transform = `translate(0,0)`;
+                    joyWrapper.style.display = 'none';
                 } else if (t.identifier === touchData.lookTouchId) {
                     touchData.lookTouchId = null;
                 }
@@ -419,7 +427,6 @@
         }
 
         let prevTime = performance.now();
-        let frameCount = 0;
 
         function animate() {
             requestAnimationFrame(animate);
@@ -428,7 +435,6 @@
             const time = performance.now();
             const delta = Math.min((time - prevTime) / 1000, 0.05);
             prevTime = time;
-            frameCount++;
 
             let isRunning = keys['ShiftLeft'] || (isTouch && Math.abs(touchData.moveY) > 0.8);
             if (isRunning && (keys['KeyW'] || touchData.active) && stamina > 0) {
@@ -475,7 +481,6 @@
             cameraHolder.position.y += velocity.y * delta;
             if (cameraHolder.position.y > 10.5) { cameraHolder.position.y = 10.5; velocity.y = 0; }
 
-            // КОЛЛИЗИИ СТЕН
             wallObjects.forEach(w => {
                 const dx = cameraHolder.position.x - w.position.x;
                 const dz = Math.abs(cameraHolder.position.z - w.position.z);
@@ -518,7 +523,6 @@
                 lastZ -= 10; generateChunk(lastZ); cleanup(cameraHolder.position.z); 
             }
 
-            // ПЛАВНАЯ СМЕНА ЦВЕТА СВЕТА
             const hue = (time * 0.00015) % 1; 
             const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
             lamps.forEach(l => { 
@@ -539,7 +543,6 @@
             renderer.render(scene, camera);
         }
         
-        // ОБЩИЙ СВЕТ (СДЕЛАНО СВЕТЛЕЕ)
         scene.add(new THREE.AmbientLight(0xffffff, 0.8));
         animate();
         window.onresize = () => {
