@@ -56,7 +56,6 @@
         #stamina-bar { width: 180px; height: 10px; border: 2px solid var(--neon-blue); background: rgba(0,0,0,0.5); margin-top: 10px; }
         #stamina-fill { width: 100%; height: 100%; background: var(--neon-blue); }
 
-        /* Mobile Controls UI */
         #joystick-wrapper {
             position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px;
             background: rgba(255,255,255,0.1); border: 2px solid var(--neon-blue);
@@ -128,17 +127,16 @@
 <script>
     const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-    // --- L10N ---
     const i18n = {
         ru: {
-            ctrl: isTouch ? `> ДЖОЙСТИК: <span class="yellow">ДВИЖЕНИЕ</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">БЕГ АВТОМАТИЧЕСКИ</span>` : 
+            ctrl: isTouch ? `> ДЖОЙСТИК: <span class="yellow">ДВИЖЕНИЕ</span><br>> ЭКРАН СПРАВА: <span class="yellow">ОБЗОР</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">АВТО-БЕГ</span>` : 
                  `> WASD: <span class="yellow">ДВИЖЕНИЕ</span><br>> SHIFT: <span class="yellow">СПРИНТ (ДЭШ)</span><br>> ПКМ + SHIFT: <span class="yellow">БЕГ ПО СТЕНЕ</span><br>> ПРОБЕЛ: <span class="pink">ПРЫЖОК / ОТСКОК</span><br>> ЛКМ: <span class="pink">УДАР ПО ВИРУСУ</span>`,
             boot: "ЗАПУСК_СИСТЕМЫ", pause: "ПАУЗА", proceed: "ПРОДОЛЖИТЬ", crash: "СБОЙ_СИСТЕМЫ", reboot: "ПЕРЕЗАГРУЗКА", 
             ui_score: "ЯДРА", ui_dist: "ДИСТ", ui_kills: "ВИРУСЫ", ui_best: "РЕКОРД",
             new_rec: " (НОВЫЙ!)"
         },
         en: {
-            ctrl: isTouch ? `> JOYSTICK: <span class="yellow">MOVEMENT</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN</span>` :
+            ctrl: isTouch ? `> JOYSTICK: <span class="yellow">MOVEMENT</span><br>> RIGHT SCREEN: <span class="yellow">LOOK</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN</span>` :
                  `> WASD: <span class="yellow">MOVEMENT</span><br>> SHIFT: <span class="yellow">SPRINT (DASH)</span><br>> RMB + SHIFT: <span class="yellow">WALL_RUN</span><br>> SPACE: <span class="pink">JUMP / WALL_JUMP</span><br>> LEFT_CLICK: <span class="pink">STRIKE VIRUS</span>`,
             boot: "BOOT_SYSTEM", pause: "PAUSED", proceed: "PROCEED", crash: "SYSTEM_CRASH", reboot: "REBOOT", 
             ui_score: "CORES", ui_dist: "DIST", ui_kills: "KILLS", ui_best: "BEST",
@@ -161,14 +159,12 @@
     document.getElementById('btn-en').onclick = () => updateLang('en');
     updateLang('ru');
 
-    // --- RECORDS ---
     let records = {
         score: parseInt(localStorage.getItem('br_best_score') || '0'),
         dist: parseInt(localStorage.getItem('br_best_dist') || '0'),
         kills: parseInt(localStorage.getItem('br_best_kills') || '0')
     };
 
-    // --- AUDIO ---
     const bgMusic = new Audio();
     const playlist = ['ByteRush1.mp3', 'ByteRush2.mp3'];
     let trackIdx = parseInt(localStorage.getItem('lastTrackIdx') || '0');
@@ -182,21 +178,21 @@
     }
 
     function createCircuitTexture(renderer) {
-        const size = 1024;
+        const size = 512; // Меньше размер текстуры для мобилок
         const canvas = document.createElement('canvas');
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = '#020205'; ctx.fillRect(0, 0, size, size);
         ctx.strokeStyle = '#080812'; ctx.lineWidth = 2;
-        for(let i=0; i<=size; i+=128) {
+        for(let i=0; i<=size; i+=64) {
             ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, size); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(size, i); ctx.stroke();
         }
         ctx.strokeStyle = '#00f0ff'; ctx.lineWidth = 1; ctx.globalAlpha = 0.3;
         for(let i=0; i<8; i++) {
-            let x = Math.floor(Math.random() * 8) * 128;
-            let y = Math.floor(Math.random() * 8) * 128;
-            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 128, y); ctx.lineTo(x + 128, y + 128); ctx.stroke();
+            let x = Math.floor(Math.random() * 8) * 64;
+            let y = Math.floor(Math.random() * 8) * 64;
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 64, y); ctx.lineTo(x + 64, y + 64); ctx.stroke();
         }
         const texture = new THREE.CanvasTexture(canvas);
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -206,7 +202,7 @@
     window.onload = function() {
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x010103);
-        scene.fog = new THREE.Fog(0x010103, 10, 110);
+        scene.fog = new THREE.Fog(0x010103, 10, 100);
 
         const cameraHolder = new THREE.Group();
         cameraHolder.position.y = 2.2; 
@@ -214,9 +210,10 @@
         cameraHolder.add(camera);
         scene.add(cameraHolder);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: !isTouch });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        // ОПТИМИЗАЦИЯ: Лимит разрешения
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.3)); 
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.PointerLockControls(cameraHolder, document.body);
@@ -314,7 +311,7 @@
                 if (Math.abs(z) % 20 === 0) {
                     const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 4}));
                     l.position.set(x > 0 ? 7.2 : -7.2, 5, z); scene.add(l);
-                    const pl = new THREE.PointLight(0x00f0ff, 2, 22); pl.position.copy(l.position); scene.add(pl);
+                    const pl = new THREE.PointLight(0x00f0ff, 1.5, 20); pl.position.copy(l.position); scene.add(pl);
                     lamps.push({ mesh: l, light: pl });
                 }
             });
@@ -337,7 +334,6 @@
         const downRay = new THREE.Raycaster();
         const sideRay = new THREE.Raycaster();
 
-        // --- Keyboard Controls ---
         document.addEventListener('keydown', e => { 
             keys[e.code] = true; 
             if (e.code === 'Space') doJump();
@@ -352,43 +348,58 @@
             else if (wallSide !== 0) { velocity.y = 16; velocity.x = -wallSide * 22; velocity.z -= 12; wallSide = 0; }
         }
 
-        // --- Mobile Joystick Logic ---
-        let touchData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0 };
+        // --- МОБИЛЬНОЕ УПРАВЛЕНИЕ (ИСПРАВЛЕНО) ---
+        let touchData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, lookTouchId: null, lastLookX: 0, lastLookY: 0 };
         const joyKnob = document.getElementById('joystick-knob');
         
-        document.getElementById('joystick-wrapper').addEventListener('touchstart', e => {
-            touchData.active = true;
-            touchData.startX = e.touches[0].clientX;
-            touchData.startY = e.touches[0].clientY;
-        });
+        renderer.domElement.addEventListener('touchstart', e => {
+            for(let i=0; i<e.changedTouches.length; i++) {
+                let t = e.changedTouches[i];
+                if (t.clientX < window.innerWidth / 2) { // Левая часть - джойстик
+                    touchData.active = true;
+                    touchData.startX = t.clientX; touchData.startY = t.clientY;
+                } else { // Правая часть - обзор
+                    touchData.lookTouchId = t.identifier;
+                    touchData.lastLookX = t.clientX; touchData.lastLookY = t.clientY;
+                }
+            }
+        }, {passive: false});
 
         window.addEventListener('touchmove', e => {
-            if (!touchData.active) {
-                // Look around logic for mobile
-                if (gameActive && e.touches[0].clientX > window.innerWidth / 2) {
-                    const movementX = e.movementX || 0;
-                    cameraHolder.rotation.y -= (e.touches[0].clientX - (touchData.lastX || e.touches[0].clientX)) * 0.005;
+            for(let i=0; i<e.changedTouches.length; i++) {
+                let t = e.changedTouches[i];
+                if (touchData.active && t.clientX < window.innerWidth / 2) {
+                    const dx = t.clientX - touchData.startX;
+                    const dy = t.clientY - touchData.startY;
+                    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
+                    const angle = Math.atan2(dy, dx);
+                    touchData.moveX = Math.cos(angle) * (dist / 50);
+                    touchData.moveY = Math.sin(angle) * (dist / 50);
+                    joyKnob.style.transform = `translate(${touchData.moveX * 50}px, ${touchData.moveY * 50}px)`;
+                } else if (t.identifier === touchData.lookTouchId) {
+                    const dx = t.clientX - touchData.lastLookX;
+                    const dy = t.clientY - touchData.lastLookY;
+                    cameraHolder.rotation.y -= dx * 0.006;
+                    touchData.lastLookX = t.clientX; touchData.lastLookY = t.clientY;
                 }
-                touchData.lastX = e.touches[0].clientX;
-                return;
             }
-            const dx = e.touches[0].clientX - touchData.startX;
-            const dy = e.touches[0].clientY - touchData.startY;
-            const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
-            const angle = Math.atan2(dy, dx);
-            touchData.moveX = Math.cos(angle) * (dist / 50);
-            touchData.moveY = Math.sin(angle) * (dist / 50);
-            joyKnob.style.transform = `translate(${touchData.moveX * 50}px, ${touchData.moveY * 50}px)`;
+        }, {passive: false});
+
+        window.addEventListener('touchend', e => {
+            for(let i=0; i<e.changedTouches.length; i++) {
+                let t = e.changedTouches[i];
+                if (t.clientX < window.innerWidth / 2) {
+                    touchData.active = false;
+                    touchData.moveX = 0; touchData.moveY = 0;
+                    joyKnob.style.transform = `translate(0,0)`;
+                } else if (t.identifier === touchData.lookTouchId) {
+                    touchData.lookTouchId = null;
+                }
+            }
         });
 
-        window.addEventListener('touchend', () => {
-            touchData.active = false;
-            touchData.moveX = 0; touchData.moveY = 0;
-            joyKnob.style.transform = `translate(0,0)`;
-        });
-
-        document.getElementById('m-jump').ontouchstart = (e) => { e.preventDefault(); doJump(); };
-        document.getElementById('m-atk').ontouchstart = (e) => { e.preventDefault(); attack(); };
+        document.getElementById('m-jump').addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
+        document.getElementById('m-atk').addEventListener('touchstart', (e) => { e.preventDefault(); attack(); });
 
         function attack() {
             if (isAttacking || (!controls.isLocked && !isTouch)) return;
@@ -405,6 +416,7 @@
         }
 
         let prevTime = performance.now();
+        let frameCount = 0;
         function animate() {
             requestAnimationFrame(animate);
             if (!gameActive) return;
@@ -412,8 +424,8 @@
             const time = performance.now();
             const delta = Math.min((time - prevTime) / 1000, 0.05);
             prevTime = time;
+            frameCount++;
 
-            // Sprint logic
             let isRunning = keys['ShiftLeft'] || (isTouch && Math.abs(touchData.moveY) > 0.8);
             if (isRunning && (keys['KeyW'] || touchData.active) && stamina > 0) {
                 speedFactor = THREE.MathUtils.lerp(speedFactor, 2.4, 0.1); stamina -= 38 * delta;
@@ -425,17 +437,16 @@
             velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta; velocity.y -= 38.0 * delta;
             const moveStep = 220.0 * delta * speedFactor;
 
-            // Keyboard input
             if (keys['KeyW']) velocity.z -= moveStep; if (keys['KeyS']) velocity.z += moveStep;
             if (keys['KeyA']) velocity.x -= moveStep; if (keys['KeyD']) velocity.x += moveStep;
-            // Mobile input
+            
             if (isTouch && touchData.active) {
                 velocity.z += touchData.moveY * moveStep;
                 velocity.x += touchData.moveX * moveStep;
             }
 
             wallSide = 0;
-            const isWallRunKey = isRightClick || isTouch; // Auto-wallrun on mobile
+            const isWallRunKey = isRightClick || isTouch;
             if (isWallRunKey && !canJump && stamina > 5) {
                 const dirs = [new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0)];
                 dirs.forEach((d, i) => {
@@ -502,9 +513,13 @@
                 lastZ -= 10; generateChunk(lastZ); cleanup(cameraHolder.position.z); 
             }
 
-            const hue = (time * 0.0002) % 1; 
-            const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-            lamps.forEach(l => { if(l.mesh.material) l.mesh.material.emissive.copy(color); l.light.color.copy(color); });
+            // ОПТИМИЗАЦИЯ: Обновление цвета ламп реже
+            if (frameCount % 2 === 0) {
+                const hue = (time * 0.0002) % 1; 
+                const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
+                lamps.forEach(l => { if(l.mesh.material) l.mesh.material.emissive.copy(color); l.light.color.copy(color); });
+            }
+            
             if (!isAttacking) handGroup.position.y = Math.sin(time * 0.005) * 0.02 + (velocity.z !== 0 ? Math.sin(time * 0.01)*0.04 : 0);
 
             const t = i18n[currentLang];
