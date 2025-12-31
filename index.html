@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ByteRush - Optimized</title>
+    <title>ByteRush - Balanced</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -197,7 +197,7 @@
         }
         const texture = new THREE.CanvasTexture(canvas);
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        texture.minFilter = THREE.LinearFilter; // ОПТИМИЗАЦИЯ ТЕКСТУРЫ
+        texture.minFilter = THREE.LinearFilter;
         texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
         return texture;
     }
@@ -214,8 +214,8 @@
         scene.add(cameraHolder);
 
         const renderer = new THREE.WebGLRenderer({ 
-            antialias: !isTouch, // ОТКЛЮЧАЕМ СГЛАЖИВАНИЕ ДЛЯ МОБИЛОК
-            powerPreference: "high-performance" // ПРИНУДИТЕЛЬНО ВЫСОКАЯ ПРОИЗВОДИТЕЛЬНОСТЬ
+            antialias: !isTouch,
+            powerPreference: "high-performance"
         });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(isTouch ? 1 : Math.min(window.devicePixelRatio, 2)); 
@@ -312,7 +312,7 @@
                 if (Math.abs(z) % 20 === 0) {
                     const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 5}));
                     l.position.set(x > 0 ? 7.2 : -7.2, 5, z); scene.add(l);
-                    const pl = new THREE.PointLight(0x00f0ff, 4, 25); pl.position.copy(l.position); pl.visible = false; // ПО УМОЛЧАНИЮ ВЫКЛ
+                    const pl = new THREE.PointLight(0x00f0ff, 4, 25); pl.position.copy(l.position); pl.visible = false;
                     scene.add(pl);
                     lamps.push({ mesh: l, light: pl });
                 }
@@ -346,8 +346,8 @@
         window.addEventListener('contextmenu', e => e.preventDefault());
 
         function doJump() {
-            if (canJump) { velocity.y = 15; canJump = false; }
-            else if (wallSide !== 0) { velocity.y = 16; velocity.x = -wallSide * 22; velocity.z -= 12; wallSide = 0; }
+            if (canJump) { velocity.y = 14; canJump = false; } // Чуть ниже прыжок
+            else if (wallSide !== 0) { velocity.y = 15; velocity.x = -wallSide * 20; velocity.z -= 10; wallSide = 0; }
         }
 
         let touchData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, lookTouchId: null, lastLookX: 0, lastLookY: 0 };
@@ -385,8 +385,12 @@
                     touchData.moveY = Math.sin(angle) * (dist / maxDist);
                     joyKnob.style.transform = `translate(${touchData.moveX * maxDist}px, ${touchData.moveY * maxDist}px)`;
                 } else if (t.identifier === touchData.lookTouchId) {
-                    const dx = t.clientX - touchData.lastLookX;
-                    cameraHolder.rotation.y -= dx * 0.008;
+                    // ИСПРАВЛЕННЫЙ ОБЗОР (X и Y)
+                    const movementX = t.clientX - touchData.lastLookX;
+                    const movementY = t.clientY - touchData.lastLookY;
+                    cameraHolder.rotation.y -= movementX * 0.006;
+                    camera.rotation.x -= movementY * 0.006;
+                    camera.rotation.x = Math.max(-Math.PI/2.3, Math.min(Math.PI/2.3, camera.rotation.x));
                     touchData.lastLookX = t.clientX; touchData.lastLookY = t.clientY;
                 }
             }
@@ -431,16 +435,22 @@
             const delta = Math.min((time - prevTime) / 1000, 0.05);
             prevTime = time;
 
+            // ПЛАВНОЕ ЗАМЕДЛЕНИЕ
             let isRunning = keys['ShiftLeft'] || (isTouch && Math.abs(touchData.moveY) > 0.8);
             if (isRunning && (keys['KeyW'] || touchData.active) && stamina > 0) {
-                speedFactor = THREE.MathUtils.lerp(speedFactor, 2.5, 0.1); stamina -= 35 * delta;
+                speedFactor = THREE.MathUtils.lerp(speedFactor, 2.1, 0.05); // Было 2.5
+                stamina -= 30 * delta;
             } else {
-                speedFactor = THREE.MathUtils.lerp(speedFactor, 1.0, 0.2); if (stamina < 100) stamina += 25 * delta;
+                speedFactor = THREE.MathUtils.lerp(speedFactor, 1.0, 0.1); 
+                if (stamina < 100) stamina += 20 * delta;
             }
             document.getElementById('stamina-fill').style.width = Math.max(0, stamina) + '%';
 
-            velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta; velocity.y -= 38.0 * delta;
-            const moveStep = 230.0 * delta * speedFactor;
+            velocity.x -= velocity.x * 10.0 * delta; 
+            velocity.z -= velocity.z * 10.0 * delta; 
+            velocity.y -= 38.0 * delta;
+
+            const moveStep = 180.0 * delta * speedFactor; // Базовый шаг меньше (было 230)
 
             if (keys['KeyW']) velocity.z -= moveStep; if (keys['KeyS']) velocity.z += moveStep;
             if (keys['KeyA']) velocity.x -= moveStep; if (keys['KeyD']) velocity.x += moveStep;
@@ -462,8 +472,8 @@
                 });
             }
             if (wallSide !== 0) {
-                velocity.y = 0; velocity.z -= 80 * delta;
-                camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, 0.35 * wallSide, 0.1);
+                velocity.y = 0; velocity.z -= 60 * delta; // Замедлен бег по стене
+                camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, 0.3 * wallSide, 0.1);
             } else { camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, 0, 0.1); }
 
             if (!isTouch) {
@@ -494,7 +504,7 @@
                 if (cameraHolder.position.distanceTo(c.position) < 2.3) { scene.remove(c); coins.splice(idx, 1); score += 1; }
             });
 
-            if (hazardObjects.some(h => cameraHolder.position.distanceTo(h.position) < 2.2) || cameraHolder.position.y < -15) {
+            if (hazardObjects.some(h => cameraHolder.position.distanceTo(h.position) < 2.1) || cameraHolder.position.y < -15) {
                 gameActive = false;
                 if(!isTouch) controls.unlock();
                 const isNewS = score > records.score;
@@ -521,12 +531,12 @@
             const hue = (time * 0.00015) % 1; 
             const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
 
-            // ОПТИМИЗИРОВАННЫЙ СВЕТ: Только 4 ближайшие лампы светят
+            // БОЛЬШЕ СВЕТА: 8 ближайших ламп
             lamps.sort((a, b) => {
                 return cameraHolder.position.distanceToSquared(a.mesh.position) - cameraHolder.position.distanceToSquared(b.mesh.position);
             });
             lamps.forEach((l, idx) => { 
-                const isNear = idx < 4;
+                const isNear = idx < 8; // Увеличено до 8
                 l.light.visible = isNear;
                 if(isNear) {
                     if(l.mesh.material) l.mesh.material.emissive.copy(color); 
