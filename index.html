@@ -56,17 +56,31 @@
         #stamina-bar { width: 180px; height: 10px; border: 2px solid var(--neon-blue); background: rgba(0,0,0,0.5); margin-top: 10px; }
         #stamina-fill { width: 100%; height: 100%; background: var(--neon-blue); }
 
-        /* ИСПРАВЛЕННЫЙ ДЖОЙСТИК (Динамический) */
+        /* ИСПРАВЛЕННЫЙ ДЖОЙСТИК */
         #joystick-wrapper {
-            position: absolute; width: 100px; height: 100px;
-            background: rgba(255,255,255,0.05); border: 2px solid var(--neon-blue);
-            border-radius: 50%; display: none; z-index: 2000; touch-action: none;
-            pointer-events: none; transform: translate(-50%, -50%);
+            position: absolute; 
+            width: 100px; 
+            height: 100px;
+            background: rgba(0, 240, 255, 0.1); 
+            border: 2px solid var(--neon-blue);
+            border-radius: 50%; 
+            display: none; 
+            z-index: 2000; 
+            touch-action: none;
+            pointer-events: none;
+            /* Важно: убираем transform: translate(-50%, -50%) и используем отрицательные отступы */
+            margin-left: -50px; 
+            margin-top: -50px;
         }
         #joystick-knob {
-            position: absolute; top: 25px; left: 25px; width: 50px; height: 50px;
-            background: var(--neon-blue); border-radius: 50%; box-shadow: 0 0 15px var(--neon-blue);
-            pointer-events: none;
+            position: absolute; 
+            top: 25px; 
+            left: 25px; 
+            width: 50px; 
+            height: 50px;
+            background: var(--neon-blue); 
+            border-radius: 50%; 
+            box-shadow: 0 0 15px var(--neon-blue);
         }
         
         #mobile-btns {
@@ -134,14 +148,14 @@
     const i18n = {
         ru: {
             ctrl: isTouch ? `> ЭКРАН СЛЕВА: <span class="yellow">ДЖОЙСТИК</span><br>> ЭКРАН СПРАВА: <span class="yellow">ОБЗОР</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">АВТО-БЕГ</span>` : 
-                 `> WASD: <span class="yellow">ДВИЖЕНИЕ</span><br>> SHIFT: <span class="yellow">СПРИНТ (ДЭШ)</span><br>> ПКМ + SHIFT: <span class="yellow">БЕГ ПО СТЕНЕ</span><br>> ПРОБЕЛ: <span class="pink">ПРЫЖОК / ОТСКОК</span><br>> ЛКМ: <span class="pink">УДАР ПО ВИРУСУ</span>`,
+                  `> WASD: <span class="yellow">ДВИЖЕНИЕ</span><br>> SHIFT: <span class="yellow">СПРИНТ (ДЭШ)</span><br>> ПКМ + SHIFT: <span class="yellow">БЕГ ПО СТЕНЕ</span><br>> ПРОБЕЛ: <span class="pink">ПРЫЖОК / ОТСКОК</span><br>> ЛКМ: <span class="pink">УДАР ПО ВИРУСУ</span>`,
             boot: "ЗАПУСК_СИСТЕМЫ", pause: "ПАУЗА", proceed: "ПРОДОЛЖИТЬ", crash: "СБОЙ_СИСТЕМЫ", reboot: "ПЕРЕЗАГРУЗКА", 
             ui_score: "ЯДРА", ui_dist: "ДИСТ", ui_kills: "ВИРУСЫ", ui_best: "РЕКОРД",
             new_rec: " (НОВЫЙ!)"
         },
         en: {
             ctrl: isTouch ? `> LEFT SCREEN: <span class="yellow">JOYSTICK</span><br>> RIGHT SCREEN: <span class="yellow">LOOK</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN</span>` :
-                 `> WASD: <span class="yellow">MOVEMENT</span><br>> SHIFT: <span class="yellow">SPRINT (DASH)</span><br>> RMB + SHIFT: <span class="yellow">WALL_RUN</span><br>> SPACE: <span class="pink">JUMP / WALL_JUMP</span><br>> LEFT_CLICK: <span class="pink">STRIKE VIRUS</span>`,
+                  `> WASD: <span class="yellow">MOVEMENT</span><br>> SHIFT: <span class="yellow">SPRINT (DASH)</span><br>> RMB + SHIFT: <span class="yellow">WALL_RUN</span><br>> SPACE: <span class="pink">JUMP / WALL_JUMP</span><br>> LEFT_CLICK: <span class="pink">STRIKE VIRUS</span>`,
             boot: "BOOT_SYSTEM", pause: "PAUSED", proceed: "PROCEED", crash: "SYSTEM_CRASH", reboot: "REBOOT", 
             ui_score: "CORES", ui_dist: "DIST", ui_kills: "KILLS", ui_best: "BEST",
             new_rec: " (NEW!)"
@@ -353,7 +367,7 @@
             else if (wallSide !== 0) { velocity.y = 16; velocity.x = -wallSide * 22; velocity.z -= 12; wallSide = 0; }
         }
 
-        // --- ИСПРАВЛЕННЫЙ ДЖОЙСТИК (ЦЕНТРИРУЕТСЯ ПО КАСАНИЮ) ---
+        // --- ЛОГИКА ДЖОЙСТИКА (БЕЗ КОНФЛИКТОВ ТРАНСФОРМА) ---
         let touchData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, lookTouchId: null, lastLookX: 0, lastLookY: 0 };
         const joyWrapper = document.getElementById('joystick-wrapper');
         const joyKnob = document.getElementById('joystick-knob');
@@ -362,15 +376,17 @@
             e.preventDefault();
             for(let i=0; i<e.changedTouches.length; i++) {
                 let t = e.changedTouches[i];
-                // Левая половина экрана - джойстик
-                if (t.clientX < window.innerWidth / 2) { 
+                if (t.clientX < window.innerWidth / 2 && !touchData.active) { 
                     touchData.active = true;
                     touchData.startX = t.clientX; touchData.startY = t.clientY;
+                    
+                    // Позиционируем обертку точно в центр касания
                     joyWrapper.style.display = 'block';
                     joyWrapper.style.left = t.clientX + 'px';
                     joyWrapper.style.top = t.clientY + 'px';
+                    // Сбрасываем кноб
+                    joyKnob.style.transform = `translate(0px, 0px)`;
                 } else {
-                    // Правая половина экрана - обзор
                     touchData.lookTouchId = t.identifier;
                     touchData.lastLookX = t.clientX; touchData.lastLookY = t.clientY;
                 }
@@ -414,7 +430,7 @@
         document.getElementById('m-atk').addEventListener('touchstart', (e) => { e.preventDefault(); attack(); });
 
         function attack() {
-            if (isAttacking || (!controls.isLocked && !isTouch)) return;
+            if (isAttacking || (!gameActive)) return;
             isAttacking = true;
             leftH.position.z -= 1.2; rightH.position.z -= 1.2;
             const attackRay = new THREE.Raycaster(cameraHolder.position, camera.getWorldDirection(new THREE.Vector3()));
