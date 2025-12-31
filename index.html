@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ByteRush - Joystick Fixed</title>
+    <title>ByteRush - Optimized</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -54,38 +54,20 @@
         .best-label { font-size: 8px; color: var(--neon-yellow); display: block; margin-top: 2px; opacity: 0.8; }
         
         #stamina-bar { width: 180px; height: 10px; border: 2px solid var(--neon-blue); background: rgba(0,0,0,0.5); margin-top: 10px; }
-        #stamina-fill { width: 100%; height: 100%; background: var(--neon-blue); }
+        #stamina-fill { width: 100%; height: 100%; background: var(--neon-blue); transition: width 0.1s; }
 
-        /* ИСПРАВЛЕННЫЙ ДЖОЙСТИК */
         #joystick-wrapper {
-            position: absolute; 
-            width: 100px; 
-            height: 100px;
-            background: rgba(0, 240, 255, 0.1); 
-            border: 2px solid var(--neon-blue);
-            border-radius: 50%; 
-            display: none; 
-            z-index: 2000; 
-            touch-action: none;
-            pointer-events: none;
-            /* Важно: убираем transform: translate(-50%, -50%) и используем отрицательные отступы */
-            margin-left: -50px; 
-            margin-top: -50px;
+            position: absolute; width: 100px; height: 100px;
+            background: rgba(0, 240, 255, 0.1); border: 2px solid var(--neon-blue);
+            border-radius: 50%; display: none; z-index: 2000; touch-action: none;
+            pointer-events: none; margin-left: -50px; margin-top: -50px;
         }
         #joystick-knob {
-            position: absolute; 
-            top: 25px; 
-            left: 25px; 
-            width: 50px; 
-            height: 50px;
-            background: var(--neon-blue); 
-            border-radius: 50%; 
-            box-shadow: 0 0 15px var(--neon-blue);
+            position: absolute; top: 25px; left: 25px; width: 50px; height: 50px;
+            background: var(--neon-blue); border-radius: 50%; box-shadow: 0 0 15px var(--neon-blue);
         }
         
-        #mobile-btns {
-            position: absolute; bottom: 40px; right: 40px; display: none; gap: 20px; z-index: 2000;
-        }
+        #mobile-btns { position: absolute; bottom: 40px; right: 40px; display: none; gap: 20px; z-index: 2000; }
         .m-btn {
             width: 70px; height: 70px; border: 2px solid var(--neon-pink); border-radius: 50%;
             background: rgba(255,0,85,0.2); color: white; display: flex; 
@@ -230,9 +212,9 @@
         cameraHolder.add(camera);
         scene.add(cameraHolder);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: !isTouch });
+        const renderer = new THREE.WebGLRenderer({ antialias: !isTouch, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); 
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.PointerLockControls(cameraHolder, document.body);
@@ -265,7 +247,10 @@
             }
         });
 
+        // ПРЕКЭШ ГЕОМЕТРИИ (ОПТИМИЗАЦИЯ)
         const chipTexture = createCircuitTexture(renderer);
+        const wallGeo = new THREE.BoxGeometry(1.5, 25, 10);
+        const floorGeo = new THREE.BoxGeometry(16, 1, 10.1);
         const wallMaterial = new THREE.MeshStandardMaterial({ map: chipTexture, roughness: 0.7 });
         const floorMaterial = new THREE.MeshStandardMaterial({ map: chipTexture, roughness: 0.7 });
 
@@ -288,11 +273,8 @@
 
         function removeObject(obj, array) {
             scene.remove(obj);
-            if (obj.geometry) obj.geometry.dispose();
-            if (obj.material) {
-                if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
-                else obj.material.dispose();
-            }
+            // НЕ удаляем геометрию, если она общая (floorGeo/wallGeo), удаляем только уникальные
+            if (obj.geometry && obj.geometry !== floorGeo && obj.geometry !== wallGeo) obj.geometry.dispose();
             const idx = array.indexOf(obj);
             if (idx > -1) array.splice(idx, 1);
         }
@@ -306,7 +288,8 @@
             });
             for (let i = lamps.length - 1; i >= 0; i--) {
                 if (lamps[i].mesh.position.z > threshold) {
-                    scene.remove(lamps[i].light); removeObject(lamps[i].mesh, []);
+                    scene.remove(lamps[i].light);
+                    scene.remove(lamps[i].mesh);
                     lamps.splice(i, 1);
                 }
             }
@@ -316,19 +299,16 @@
             const isSafe = z > -60;
             const rand = Math.random();
             if (isSafe || rand > 0.25) {
-                let w = isSafe ? 16 : (rand > 0.8 ? 8 : 14); 
-                let xPos = isSafe ? 0 : (rand > 0.8 ? (Math.random() > 0.5 ? 4 : -4) : 0);
-                const f = new THREE.Mesh(new THREE.BoxGeometry(w, 1, 10.1), floorMaterial);
-                f.position.set(xPos, -1, z); scene.add(f); floorObjects.push(f);
-                const ceil = new THREE.Mesh(new THREE.BoxGeometry(w, 1, 10.1), floorMaterial);
-                ceil.position.set(xPos, 12, z); scene.add(ceil); floorObjects.push(ceil);
+                const f = new THREE.Mesh(floorGeo, floorMaterial);
+                f.position.set(0, -1, z); scene.add(f); floorObjects.push(f);
+                const ceil = new THREE.Mesh(floorGeo, floorMaterial);
+                ceil.position.set(0, 12, z); scene.add(ceil); floorObjects.push(ceil);
             }
             [-8, 8].forEach(x => {
-                const w = new THREE.Mesh(new THREE.BoxGeometry(1.5, 25, 10), wallMaterial);
+                const w = new THREE.Mesh(wallGeo, wallMaterial);
                 w.position.set(x, 10, z); scene.add(w); wallObjects.push(w);
                 if (Math.abs(z) % 20 === 0) {
-                    const lMat = new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 5});
-                    const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), lMat);
+                    const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 5}));
                     l.position.set(x > 0 ? 7.2 : -7.2, 5, z); scene.add(l);
                     const pl = new THREE.PointLight(0x00f0ff, 4, 25); pl.position.copy(l.position); scene.add(pl);
                     lamps.push({ mesh: l, light: pl });
@@ -367,7 +347,6 @@
             else if (wallSide !== 0) { velocity.y = 16; velocity.x = -wallSide * 22; velocity.z -= 12; wallSide = 0; }
         }
 
-        // --- ЛОГИКА ДЖОЙСТИКА (БЕЗ КОНФЛИКТОВ ТРАНСФОРМА) ---
         let touchData = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, lookTouchId: null, lastLookX: 0, lastLookY: 0 };
         const joyWrapper = document.getElementById('joystick-wrapper');
         const joyKnob = document.getElementById('joystick-knob');
@@ -379,12 +358,9 @@
                 if (t.clientX < window.innerWidth / 2 && !touchData.active) { 
                     touchData.active = true;
                     touchData.startX = t.clientX; touchData.startY = t.clientY;
-                    
-                    // Позиционируем обертку точно в центр касания
                     joyWrapper.style.display = 'block';
                     joyWrapper.style.left = t.clientX + 'px';
                     joyWrapper.style.top = t.clientY + 'px';
-                    // Сбрасываем кноб
                     joyKnob.style.transform = `translate(0px, 0px)`;
                 } else {
                     touchData.lookTouchId = t.identifier;
