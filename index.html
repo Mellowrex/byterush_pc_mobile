@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ByteRush - Balanced</title>
+    <title>ByteRush - Enhanced</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -129,15 +129,15 @@
 
     const i18n = {
         ru: {
-            ctrl: isTouch ? `> ЭКРАН СЛЕВА: <span class="yellow">ДЖОЙСТИК</span><br>> ЭКРАН СПРАВА: <span class="yellow">ОБЗОР</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">АВТО-БЕГ</span>` : 
-                  `> WASD: <span class="yellow">ДВИЖЕНИЕ</span><br>> SHIFT: <span class="yellow">СПРИНТ (ДЭШ)</span><br>> ПКМ + SHIFT: <span class="yellow">БЕГ ПО СТЕНЕ</span><br>> ПРОБЕЛ: <span class="pink">ПРЫЖОК / ОТСКОК</span><br>> ЛКМ: <span class="pink">УДАР ПО ВИРУСУ</span>`,
+            ctrl: isTouch ? `> ЭКРАН СЛЕВА: <span class="yellow">ДЖОЙСТИК</span><br>> ЭКРАН СПРАВА: <span class="yellow">ОБЗОР</span><br>> КНОПКИ: <span class="pink">ПРЫЖОК И УДАР</span><br>> СТЕНЫ: <span class="yellow">АВТО-БЕГ И ПАРКУР</span>` : 
+                  `> WASD: <span class="yellow">ДВИЖЕНИЕ</span><br>> SHIFT: <span class="yellow">СПРИНТ (ДЭШ)</span><br>> ПКМ + SHIFT: <span class="yellow">БЕГ ПО СТЕНЕ</span><br>> ПРОБЕЛ: <span class="pink">ПРЫЖОК</span><br>> ЛКМ: <span class="pink">УДАР ПО ВИРУСУ</span>`,
             boot: "ЗАПУСК_СИСТЕМЫ", pause: "ПАУЗА", proceed: "ПРОДОЛЖИТЬ", crash: "СБОЙ_СИСТЕМЫ", reboot: "ПЕРЕЗАГРУЗКА", 
             ui_score: "ЯДРА", ui_dist: "ДИСТ", ui_kills: "ВИРУСЫ", ui_best: "РЕКОРД",
             new_rec: " (НОВЫЙ!)"
         },
         en: {
-            ctrl: isTouch ? `> LEFT SCREEN: <span class="yellow">JOYSTICK</span><br>> RIGHT SCREEN: <span class="yellow">LOOK</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN</span>` :
-                  `> WASD: <span class="yellow">MOVEMENT</span><br>> SHIFT: <span class="yellow">SPRINT (DASH)</span><br>> RMB + SHIFT: <span class="yellow">WALL_RUN</span><br>> SPACE: <span class="pink">JUMP / WALL_JUMP</span><br>> LEFT_CLICK: <span class="pink">STRIKE VIRUS</span>`,
+            ctrl: isTouch ? `> LEFT SCREEN: <span class="yellow">JOYSTICK</span><br>> RIGHT SCREEN: <span class="yellow">LOOK</span><br>> BUTTONS: <span class="pink">JUMP & STRIKE</span><br>> WALLS: <span class="yellow">AUTO WALL-RUN & PARKOUR</span>` :
+                  `> WASD: <span class="yellow">MOVEMENT</span><br>> SHIFT: <span class="yellow">SPRINT (DASH)</span><br>> RMB + SHIFT: <span class="yellow">WALL_RUN</span><br>> SPACE: <span class="pink">JUMP</span><br>> LEFT_CLICK: <span class="pink">STRIKE VIRUS</span>`,
             boot: "BOOT_SYSTEM", pause: "PAUSED", proceed: "PROCEED", crash: "SYSTEM_CRASH", reboot: "REBOOT", 
             ui_score: "CORES", ui_dist: "DIST", ui_kills: "KILLS", ui_best: "BEST",
             new_rec: " (NEW!)"
@@ -223,6 +223,19 @@
 
         const controls = new THREE.PointerLockControls(cameraHolder, document.body);
         let gameActive = false;
+
+        // --- СИСТЕМА ЧАСТИЦ ---
+        const particles = [];
+        const particleGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        function spawnExplosion(pos, color, count = 10) {
+            for(let i=0; i<count; i++) {
+                const p = new THREE.Mesh(particleGeo, new THREE.MeshBasicMaterial({color: color}));
+                p.position.copy(pos);
+                const vel = new THREE.Vector3((Math.random()-0.5)*0.3, (Math.random()-0.5)*0.3, (Math.random()-0.5)*0.3);
+                particles.push({mesh: p, vel: vel, life: 1.0});
+                scene.add(p);
+            }
+        }
 
         document.getElementById('start-btn').onclick = () => { 
             if(!isTouch) controls.lock(); 
@@ -335,6 +348,7 @@
         let canJump = false, wallSide = 0;
         const downRay = new THREE.Raycaster();
         const sideRay = new THREE.Raycaster();
+        const frontRay = new THREE.Raycaster(); // Для паркура
 
         document.addEventListener('keydown', e => { 
             keys[e.code] = true; 
@@ -346,7 +360,7 @@
         window.addEventListener('contextmenu', e => e.preventDefault());
 
         function doJump() {
-            if (canJump) { velocity.y = 14; canJump = false; } // Чуть ниже прыжок
+            if (canJump) { velocity.y = 14; canJump = false; }
             else if (wallSide !== 0) { velocity.y = 15; velocity.x = -wallSide * 20; velocity.z -= 10; wallSide = 0; }
         }
 
@@ -385,7 +399,6 @@
                     touchData.moveY = Math.sin(angle) * (dist / maxDist);
                     joyKnob.style.transform = `translate(${touchData.moveX * maxDist}px, ${touchData.moveY * maxDist}px)`;
                 } else if (t.identifier === touchData.lookTouchId) {
-                    // ИСПРАВЛЕННЫЙ ОБЗОР (X и Y)
                     const movementX = t.clientX - touchData.lastLookX;
                     const movementY = t.clientY - touchData.lastLookY;
                     cameraHolder.rotation.y -= movementX * 0.006;
@@ -419,6 +432,7 @@
             const attackRay = new THREE.Raycaster(cameraHolder.position, camera.getWorldDirection(new THREE.Vector3()));
             const hits = attackRay.intersectObjects(hazardObjects);
             if (hits.length > 0 && hits[0].distance < 7) {
+                spawnExplosion(hits[0].object.position, 0xff0000, 15);
                 scene.remove(hits[0].object); hazardObjects.splice(hazardObjects.indexOf(hits[0].object), 1);
                 kills++; 
             }
@@ -435,10 +449,21 @@
             const delta = Math.min((time - prevTime) / 1000, 0.05);
             prevTime = time;
 
-            // ПЛАВНОЕ ЗАМЕДЛЕНИЕ
+            // ОБНОВЛЕНИЕ ЧАСТИЦ
+            for(let i = particles.length-1; i>=0; i--) {
+                const p = particles[i];
+                p.mesh.position.add(p.vel);
+                p.life -= delta * 2;
+                p.mesh.scale.setScalar(p.life);
+                if(p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+
             let isRunning = keys['ShiftLeft'] || (isTouch && Math.abs(touchData.moveY) > 0.8);
             if (isRunning && (keys['KeyW'] || touchData.active) && stamina > 0) {
-                speedFactor = THREE.MathUtils.lerp(speedFactor, 2.1, 0.05); // Было 2.5
+                speedFactor = THREE.MathUtils.lerp(speedFactor, 2.1, 0.05);
                 stamina -= 30 * delta;
             } else {
                 speedFactor = THREE.MathUtils.lerp(speedFactor, 1.0, 0.1); 
@@ -450,7 +475,7 @@
             velocity.z -= velocity.z * 10.0 * delta; 
             velocity.y -= 38.0 * delta;
 
-            const moveStep = 180.0 * delta * speedFactor; // Базовый шаг меньше (было 230)
+            const moveStep = 180.0 * delta * speedFactor;
 
             if (keys['KeyW']) velocity.z -= moveStep; if (keys['KeyS']) velocity.z += moveStep;
             if (keys['KeyA']) velocity.x -= moveStep; if (keys['KeyD']) velocity.x += moveStep;
@@ -458,6 +483,24 @@
             if (isTouch && touchData.active) {
                 velocity.z += touchData.moveY * moveStep;
                 velocity.x += touchData.moveX * moveStep;
+            }
+
+            // ПАРКУР: Авто-подъем на препятствия
+            const lookDir = new THREE.Vector3();
+            cameraHolder.getWorldDirection(lookDir);
+            lookDir.y = 0; lookDir.normalize();
+            frontRay.set(cameraHolder.position, lookDir);
+            const wallHits = frontRay.intersectObjects(wallObjects);
+            if (wallHits.length > 0 && wallHits[0].distance < 1.5) {
+                // Если стена прямо перед нами, проверяем есть ли место сверху (ступенька)
+                const stepCheckPos = cameraHolder.position.clone().add(lookDir.multiplyScalar(1.5));
+                stepCheckPos.y += 2; // Проверяем высоту 2 метра
+                const overRay = new THREE.Raycaster(stepCheckPos, new THREE.Vector3(0,-1,0));
+                const overHits = overRay.intersectObjects(floorObjects);
+                if (overHits.length > 0 && overHits[0].distance < 2) {
+                    cameraHolder.position.y = THREE.MathUtils.lerp(cameraHolder.position.y, overHits[0].point.y + 2.2, 0.2);
+                    velocity.y = 0;
+                }
             }
 
             wallSide = 0;
@@ -472,7 +515,7 @@
                 });
             }
             if (wallSide !== 0) {
-                velocity.y = 0; velocity.z -= 60 * delta; // Замедлен бег по стене
+                velocity.y = 0; velocity.z -= 60 * delta;
                 camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, 0.3 * wallSide, 0.1);
             } else { camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, 0, 0.1); }
 
@@ -501,7 +544,10 @@
             distance = Math.floor(Math.abs(cameraHolder.position.z));
             coins.forEach((c, idx) => {
                 c.rotation.y += 0.12;
-                if (cameraHolder.position.distanceTo(c.position) < 2.3) { scene.remove(c); coins.splice(idx, 1); score += 1; }
+                if (cameraHolder.position.distanceTo(c.position) < 2.3) { 
+                    spawnExplosion(c.position, 0xffcc00, 8);
+                    scene.remove(c); coins.splice(idx, 1); score += 1; 
+                }
             });
 
             if (hazardObjects.some(h => cameraHolder.position.distanceTo(h.position) < 2.1) || cameraHolder.position.y < -15) {
@@ -531,12 +577,11 @@
             const hue = (time * 0.00015) % 1; 
             const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
 
-            // БОЛЬШЕ СВЕТА: 8 ближайших ламп
             lamps.sort((a, b) => {
                 return cameraHolder.position.distanceToSquared(a.mesh.position) - cameraHolder.position.distanceToSquared(b.mesh.position);
             });
             lamps.forEach((l, idx) => { 
-                const isNear = idx < 6; // Увеличено до 8
+                const isNear = idx < 6;
                 l.light.visible = isNear;
                 if(isNear) {
                     if(l.mesh.material) l.mesh.material.emissive.copy(color); 
@@ -567,4 +612,5 @@
 </script>
 </body>
 </html>
+
 
