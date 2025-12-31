@@ -536,7 +536,7 @@
                 return cameraHolder.position.distanceToSquared(a.mesh.position) - cameraHolder.position.distanceToSquared(b.mesh.position);
             });
             lamps.forEach((l, idx) => { 
-                const isNear = idx < 8; // Увеличено до 8
+                const isNear = idx < 6; // Увеличено до 8
                 l.light.visible = isNear;
                 if(isNear) {
                     if(l.mesh.material) l.mesh.material.emissive.copy(color); 
@@ -567,3 +567,4 @@
 </script>
 </body>
 </html>
+
