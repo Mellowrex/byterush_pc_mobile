@@ -197,6 +197,7 @@
         }
         const texture = new THREE.CanvasTexture(canvas);
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.minFilter = THREE.LinearFilter; // ОПТИМИЗАЦИЯ ТЕКСТУРЫ
         texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
         return texture;
     }
@@ -212,9 +213,12 @@
         cameraHolder.add(camera);
         scene.add(cameraHolder);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: !isTouch, powerPreference: "high-performance" });
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: !isTouch, // ОТКЛЮЧАЕМ СГЛАЖИВАНИЕ ДЛЯ МОБИЛОК
+            powerPreference: "high-performance" // ПРИНУДИТЕЛЬНО ВЫСОКАЯ ПРОИЗВОДИТЕЛЬНОСТЬ
+        });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
+        renderer.setPixelRatio(isTouch ? 1 : Math.min(window.devicePixelRatio, 2)); 
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.PointerLockControls(cameraHolder, document.body);
@@ -247,7 +251,6 @@
             }
         });
 
-        // ПРЕКЭШ ГЕОМЕТРИИ (ОПТИМИЗАЦИЯ)
         const chipTexture = createCircuitTexture(renderer);
         const wallGeo = new THREE.BoxGeometry(1.5, 25, 10);
         const floorGeo = new THREE.BoxGeometry(16, 1, 10.1);
@@ -273,7 +276,6 @@
 
         function removeObject(obj, array) {
             scene.remove(obj);
-            // НЕ удаляем геометрию, если она общая (floorGeo/wallGeo), удаляем только уникальные
             if (obj.geometry && obj.geometry !== floorGeo && obj.geometry !== wallGeo) obj.geometry.dispose();
             const idx = array.indexOf(obj);
             if (idx > -1) array.splice(idx, 1);
@@ -300,17 +302,18 @@
             const rand = Math.random();
             if (isSafe || rand > 0.25) {
                 const f = new THREE.Mesh(floorGeo, floorMaterial);
-                f.position.set(0, -1, z); scene.add(f); floorObjects.push(f);
+                f.position.set(0, -1, z); f.matrixAutoUpdate = false; f.updateMatrix(); scene.add(f); floorObjects.push(f);
                 const ceil = new THREE.Mesh(floorGeo, floorMaterial);
-                ceil.position.set(0, 12, z); scene.add(ceil); floorObjects.push(ceil);
+                ceil.position.set(0, 12, z); ceil.matrixAutoUpdate = false; ceil.updateMatrix(); scene.add(ceil); floorObjects.push(ceil);
             }
             [-8, 8].forEach(x => {
                 const w = new THREE.Mesh(wallGeo, wallMaterial);
-                w.position.set(x, 10, z); scene.add(w); wallObjects.push(w);
+                w.position.set(x, 10, z); w.matrixAutoUpdate = false; w.updateMatrix(); scene.add(w); wallObjects.push(w);
                 if (Math.abs(z) % 20 === 0) {
                     const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 5}));
                     l.position.set(x > 0 ? 7.2 : -7.2, 5, z); scene.add(l);
-                    const pl = new THREE.PointLight(0x00f0ff, 4, 25); pl.position.copy(l.position); scene.add(pl);
+                    const pl = new THREE.PointLight(0x00f0ff, 4, 25); pl.position.copy(l.position); pl.visible = false; // ПО УМОЛЧАНИЮ ВЫКЛ
+                    scene.add(pl);
                     lamps.push({ mesh: l, light: pl });
                 }
             });
@@ -517,9 +520,18 @@
 
             const hue = (time * 0.00015) % 1; 
             const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-            lamps.forEach(l => { 
-                if(l.mesh.material) l.mesh.material.emissive.copy(color); 
-                l.light.color.copy(color); 
+
+            // ОПТИМИЗИРОВАННЫЙ СВЕТ: Только 4 ближайшие лампы светят
+            lamps.sort((a, b) => {
+                return cameraHolder.position.distanceToSquared(a.mesh.position) - cameraHolder.position.distanceToSquared(b.mesh.position);
+            });
+            lamps.forEach((l, idx) => { 
+                const isNear = idx < 4;
+                l.light.visible = isNear;
+                if(isNear) {
+                    if(l.mesh.material) l.mesh.material.emissive.copy(color); 
+                    l.light.color.copy(color); 
+                }
             });
             
             if (!isAttacking) handGroup.position.y = Math.sin(time * 0.005) * 0.02 + (velocity.z !== 0 ? Math.sin(time * 0.01)*0.04 : 0);
