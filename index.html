@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ByteRush: Final Release</title>
+    <title>ByteRush: Final Director's Cut v2.2</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -11,6 +11,7 @@
             --neon-yellow: #ffcc00;
             --neon-purple: #aa00ff;
             --neon-green: #00ff00;
+            --neon-red: #ff0000;
         }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Press Start 2P', cursive; touch-action: none; user-select: none; }
         
@@ -107,6 +108,10 @@
             color: var(--neon-purple); font-size: 20px; display: none; z-index: 90;
             text-shadow: 0 0 10px var(--neon-purple);
         }
+
+        #core-progress {
+            margin-left: 10px; font-size: 8px; color: var(--neon-yellow); opacity: 0.7;
+        }
     </style>
 </head>
 <body>
@@ -145,7 +150,7 @@
     <div id="boss-hp-label">BOSS HP</div>
 
     <div id="ui">
-        <div class="stat-line"><span id="score-box">CORES: 0</span><span class="best-label" id="best-score-ui">BEST: 0</span></div>
+        <div class="stat-line"><span id="score-box">CORES: 0</span><span id="core-progress">[0/8]</span><span class="best-label" id="best-score-ui">BEST: 0</span></div>
         <div class="stat-line"><span id="dist-box">DIST: 0m</span><span class="best-label" id="best-dist-ui">BEST: 0m</span></div>
         <div class="stat-line"><span id="kill-box">KILLS: 0</span><span class="best-label" id="best-kills-ui">BEST: 0</span></div>
         <div id="stamina-bar"><div id="stamina-fill"></div></div>
@@ -219,7 +224,7 @@
         damage: function() { this.playTone(200, 'sawtooth', 0.3, 0.1, 50); this.playTone(220, 'square', 0.3, 0.1, 40); },
         laser: function() { this.playTone(1200, 'triangle', 0.3, 0.05, 200); },
         collect: function() { this.playTone(800, 'sine', 0.1, 0.05, 1200); },
-        extraLife: function() { this.playTone(400, 'sine', 0.1, 0.1); setTimeout(()=>this.playTone(600, 'sine', 0.2, 0.1), 100); }
+        extraLife: function() { this.playTone(400, 'sine', 0.1, 0.1); setTimeout(()=>this.playTone(600, 'sine', 0.3, 0.1), 150); }
     };
 
     const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -379,6 +384,15 @@
         const laserGeo = new THREE.CylinderGeometry(0.05, 0.05, 14, 8);
         laserGeo.rotateZ(Math.PI / 2);
         const laserMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+        
+        // --- NEW: BIGGER SPIKES GEOMETRY ---
+        // Radius 0.5 (was 0.25), Height 2.2 (was 1.5)
+        const spikeGeo = new THREE.ConeGeometry(0.6, 3.0, 8);
+        // Note: ConeGeometry points up (Y) by default. We will rotate the mesh.
+        const spikeMat = new THREE.MeshStandardMaterial({ 
+            color: 0xff0000, roughness: 0.3, metalness: 0.8, 
+            emissive: 0xff0000, emissiveIntensity: 0.5 
+        });
 
         const handGroup = new THREE.Group();
         camera.add(handGroup);
@@ -388,15 +402,18 @@
         let slideTime = 0;
         const SLIDE_DURATION = 0.9;
 
-        // --- HEALTH SYSTEM ---
+        // --- HEALTH & CORE SYSTEM ---
         let playerLives = 3;
+        let coresForNextLife = 0;
         let isInvincible = false;
         const livesEl = document.getElementById('lives-container');
+        const coreProgEl = document.getElementById('core-progress');
         
         function updateLivesUI() {
             let hearts = "";
             for(let i=0; i<playerLives; i++) hearts += "♥";
             livesEl.innerText = hearts;
+            coreProgEl.innerText = `[${coresForNextLife}/8]`;
         }
         updateLivesUI();
 
@@ -430,6 +447,7 @@
         handGroup.add(leftH, rightH);
 
         let wallObjects = [], floorObjects = [], hazardObjects = [], coins = [], lamps = [], lasers = [];
+        let wallSpikes = []; 
         let bosses = [];
         let bossProjectiles = []; 
         let score = 0, kills = 0, trojansKilled = 0, distance = 0, lastZ = 0;
@@ -437,14 +455,14 @@
 
         function removeObject(obj, array) {
             scene.remove(obj);
-            if (obj.geometry && obj.geometry !== floorGeo && obj.geometry !== wallGeo && obj.geometry !== laserGeo) obj.geometry.dispose();
+            if (obj.geometry && obj.geometry !== floorGeo && obj.geometry !== wallGeo && obj.geometry !== laserGeo && obj.geometry !== spikeGeo) obj.geometry.dispose();
             const idx = array.indexOf(obj);
             if (idx > -1) array.splice(idx, 1);
         }
 
         function cleanup(playerZ) {
             const threshold = playerZ + 40; 
-            [floorObjects, wallObjects, coins, hazardObjects, lasers].forEach(arr => {
+            [floorObjects, wallObjects, coins, hazardObjects, lasers, wallSpikes].forEach(arr => {
                 for (let i = arr.length - 1; i >= 0; i--) {
                     if (arr[i].position.z > threshold) removeObject(arr[i], arr);
                 }
@@ -523,23 +541,15 @@
             });
         }
 
-        // --- УМНЫЕ ФАЕРБОЛЫ (Исправленная версия) ---
         function spawnBossProjectile(origin, targetPos) {
             const mesh = new THREE.Mesh(projectileGeo, projectileMat);
             mesh.position.copy(origin);
-            
             const dist = origin.distanceTo(targetPos);
-            
-            // Если игрок близко - замедляем снаряд, чтобы дать время на реакцию
             let dynamicSpeed = Math.max(8, Math.min(25, dist * 0.7));
-            
-            // Если игрок в упор - увеличиваем разброс, чтобы можно было увернуться
             let spread = (dist < 20) ? 0.35 : 0.1;
-
             const direction = new THREE.Vector3().subVectors(targetPos, origin).normalize();
             direction.x += (Math.random() - 0.5) * spread; 
             direction.y += (Math.random() - 0.5) * spread;
-            
             scene.add(mesh);
             bossProjectiles.push({ mesh: mesh, dir: direction, speed: dynamicSpeed, life: 5 });
             SoundSys.laser();
@@ -569,15 +579,53 @@
                 ceil.position.set(0, 12, z); ceil.matrixAutoUpdate = false; ceil.updateMatrix(); scene.add(ceil); floorObjects.push(ceil);
             }
             
+            let spikeSide = 0; // 0: none, -1: left, 1: right
+            // FIXED: Spikes only if NO floor (!hasFloor), and less frequent (> 0.6)
+            if (!isSafe && !isBossChunk && !hasFloor && Math.random() > 0.6) {
+                spikeSide = Math.random() > 0.5 ? 1 : -1;
+            }
+
             [-8, 8].forEach(x => {
                 const w = new THREE.Mesh(wallGeo, wallMaterial);
                 w.position.set(x, 10, z); w.matrixAutoUpdate = false; w.updateMatrix(); scene.add(w); wallObjects.push(w);
+                
                 if (Math.abs(z) % 20 === 0) {
                     const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.12), new THREE.MeshStandardMaterial({emissive: 0x00f0ff, emissiveIntensity: 5}));
                     l.position.set(x > 0 ? 7.2 : -7.2, 5, z); scene.add(l);
                     const pl = new THREE.PointLight(0x00f0ff, 4, 25); pl.position.copy(l.position); pl.visible = false;
                     scene.add(pl);
                     lamps.push({ mesh: l, light: pl });
+                }
+
+                // --- SPIKE GENERATION FIX ---
+                const isLeftWall = x < 0;
+                const isRightWall = x > 0;
+                
+                if ((isLeftWall && spikeSide === -1) || (isRightWall && spikeSide === 1)) {
+                    // Create 3 spikes HORIZONTALLY along Z axis
+                    const spikeY = 1.5; // Player height level
+                    const offsets = [-1.4, 0, 1.4]; // Spread along Z
+                    
+                    offsets.forEach(zOffset => {
+                        const s = new THREE.Mesh(spikeGeo, spikeMat);
+                        
+                        if (isRightWall) {
+                            // Wall at X=8. Pointing Left (-X). 
+                            // Cone default is Y+. Rotate Z +90 deg.
+                            s.rotation.z = Math.PI / 2;
+                            // Position: Wall is at 8. Width 1.5. Surface ~7.25. 
+                            // Embed base in wall (X=7.8), Tip points to 0.
+                            s.position.set(7.2, spikeY, z + zOffset);
+                        } else {
+                            // Wall at X=-8. Pointing Right (+X).
+                            // Rotate Z -90 deg.
+                            s.rotation.z = -Math.PI / 2;
+                            s.position.set(-7.2, spikeY, z + zOffset);
+                        }
+                        
+                        scene.add(s);
+                        wallSpikes.push(s);
+                    });
                 }
             });
 
@@ -700,7 +748,7 @@
             let hitSomething = false;
             bosses.forEach(b => {
                 const intersect = attackRay.intersectObjects(b.group.children);
-                if(intersect.length > 0 && intersect[0].distance < 20) {
+                if(intersect.length > 0 && intersect[0].distance < 9) {
                     b.hp--;
                     b.hpBar.scale.x = b.hp / b.maxHp;
                     spawnExplosion(intersect[0].point, 0xff00ff, 20);
@@ -711,10 +759,8 @@
                         scene.remove(b.group); bosses = bosses.filter(boss => boss !== b);
                         score += 500; kills++; trojansKilled++;
                         
-                        // --- ЛОГИКА ЛЕЧЕНИЯ ПОСЛЕ БОССА ---
-                        // 1. Восстановить до 3 (если меньше)
+                        // Boss Kill Bonus
                         if (playerLives < 3) playerLives = 3;
-                        // 2. Дать +1 (итого будет минимум 4)
                         playerLives++;
                         SoundSys.extraLife();
                         updateLivesUI();
@@ -741,8 +787,6 @@
                     scene.remove(hits[0].object); hazardObjects.splice(hazardObjects.indexOf(hits[0].object), 1);
                     kills++;
                     
-                    // --- ЛОГИКА 23 ВИРУСОВ ---
-                    // Каждые 19 убийств даем жизнь
                     if (kills % 19 === 0) {
                         playerLives++;
                         updateLivesUI();
@@ -904,6 +948,16 @@
                 if (cameraHolder.position.distanceTo(c.position) < 2.3) { 
                     spawnExplosion(c.position, 0xffcc00, 8); SoundSys.collect();
                     scene.remove(c); coins.splice(idx, 1); score += 1; 
+                    
+                    // --- CORES FOR LIFE LOGIC ---
+                    coresForNextLife++;
+                    if (coresForNextLife >= 8) {
+                        coresForNextLife = 0;
+                        playerLives++;
+                        updateLivesUI();
+                        SoundSys.extraLife();
+                    }
+                    updateLivesUI();
                 }
             });
 
@@ -912,6 +966,12 @@
             }
             if (hazardObjects.some(h => cameraHolder.position.distanceTo(h.position) < 2.1)) {
                 takeDamage();
+            }
+
+            // --- SPIKE COLLISION ---
+            if (wallSpikes.some(s => cameraHolder.position.distanceTo(s.position) < 2.5)) { // Slightly larger hit radius
+                takeDamage();
+                velocity.x = (cameraHolder.position.x > 0 ? -12 : 12); // Stronger pushback
             }
 
             if (cameraHolder.position.y < -15) { playerLives = 0; gameOver(); }
