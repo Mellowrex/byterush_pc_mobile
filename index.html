@@ -969,7 +969,7 @@
             }
 
             // --- SPIKE COLLISION ---
-            if (wallSpikes.some(s => cameraHolder.position.distanceTo(s.position) < 2.5)) { // Slightly larger hit radius
+            if (wallSpikes.some(s => cameraHolder.position.distanceTo(s.position) < 3.5)) { // Slightly larger hit radius
                 takeDamage();
                 velocity.x = (cameraHolder.position.x > 0 ? -12 : 12); // Stronger pushback
             }
