@@ -573,8 +573,9 @@
             }
 
             if (!isBossChunk && hasFloor) {
-                const f = new THREE.Mesh(floorGeo, floorMaterial);
-                f.position.set(0, -1, z); f.matrixAutoUpdate = false; f.updateMatrix(); scene.add(f); floorObjects.push(f);
+                const isN = Math.random() > 0.8, xP = isN ? (Math.random() > 0.5 ? 4 : -4) : 0;
+                const f = new THREE.Mesh(floorGeo, floorMaterial); if(isN) f.scale.x = 0.5;
+                f.position.set(xP, -1, z); f.matrixAutoUpdate = false; f.updateMatrix(); scene.add(f); floorObjects.push(f);
                 const ceil = new THREE.Mesh(floorGeo, floorMaterial);
                 ceil.position.set(0, 12, z); ceil.matrixAutoUpdate = false; ceil.updateMatrix(); scene.add(ceil); floorObjects.push(ceil);
             }
@@ -968,7 +969,6 @@
                 takeDamage();
             }
 
-            // --- SPIKE COLLISION ---
             if (wallSpikes.some(s => cameraHolder.position.distanceTo(s.position) < 3.5)) { // Slightly larger hit radius
                 takeDamage();
                 velocity.x = (cameraHolder.position.x > 0 ? -12 : 12); // Stronger pushback
